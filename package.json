@@ -1,0 +1,21 @@
+{
+  "name": "event-machine-runtime",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "A minimal agent runtime: events in, transitions on disk, registry as the contract.",
+  "scripts": {
+    "test": "bun test",
+    "ping": "bun run src/index.ts ping",
+    "echo": "bun run src/index.ts echo 'hello world'",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.13",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}

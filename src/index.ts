@@ -1,3 +1,4 @@
+import { createInterface } from "node:readline";
 import { realPorts } from "./ports.ts";
 import { createInMemoryDedupStore } from "./dedup.ts";
 import { createJsonlTraceSink } from "./trace-sink.ts";
@@ -13,6 +14,7 @@ async function main(argv: string[]): Promise<void> {
     process.stdout.write(
       [
         "usage: bun run src/index.ts <type> [arg ...] [--id <uuid>]",
+        "       bun run src/index.ts --stdin   # read JSON Events, one per line",
         "",
         "registry:",
         reg,
@@ -27,9 +29,27 @@ async function main(argv: string[]): Promise<void> {
   const sink = await createJsonlTraceSink("traces/run.jsonl");
   const dispatch = buildDispatcher({ dedup, sink, ports });
 
+  if (argv[0] === "--stdin") {
+    const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
+    for await (const line of rl) {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) continue;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        // Hand the raw string to dispatch — ingress will drop it as `invalid`,
+        // which is exactly what we want recorded in the trace.
+        parsed = trimmed;
+      }
+      const t = await dispatch(parsed);
+      process.stdout.write(JSON.stringify(t) + "\n");
+    }
+    return;
+  }
+
   const event = eventFromArgv(argv, ports);
   const transition = await dispatch(event);
-
   process.stdout.write(JSON.stringify(transition, null, 2) + "\n");
 }
 

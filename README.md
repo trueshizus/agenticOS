@@ -138,6 +138,27 @@ bun run typecheck                      # strict tsc
 Trace output is appended to `traces/run.jsonl` (gitignored). One JSON
 object per line, schema-validated before write.
 
+## Wiring to NATS (or any other source)
+
+The runtime stays NATS-agnostic. `--stdin` reads newline-delimited JSON
+Events and feeds each to the dispatcher — exactly the same path as the CLI
+source, just with many events per process. NATS lives entirely in the
+operator's shell:
+
+```sh
+# consumer
+nats sub agent.events --raw | bun run src/index.ts --stdin
+
+# producer (any client, any language)
+nats pub agent.events '{"id":"e1","type":"ping","source":"nats","ts":"2026-04-25T00:00:00Z","payload":{}}'
+```
+
+For durable cross-process dedup, publish with the `Nats-Msg-Id` header set
+to `event.id` and let JetStream deduplicate inside its window — no client
+code needed. The in-memory `DedupStore` then becomes belt-and-suspenders or
+can be swapped for a no-op. Malformed JSON on stdin surfaces as a
+`dropped: invalid` Transition; nothing throws.
+
 ## Layout
 
 ```

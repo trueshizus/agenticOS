@@ -78,12 +78,26 @@ export const Outcome = z.discriminatedUnion("kind", [
 export type Outcome = z.infer<typeof Outcome>;
 
 /**
+ * AgentRef: minimal identity stamp for provenance.
+ * `sha256` is the hash of the agent.md file that was loaded at boot —
+ * two transitions with different shas were produced by different agents,
+ * even if names match.
+ */
+export const AgentRef = z.object({
+  name: z.string().min(1),
+  version: z.string().min(1),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+});
+export type AgentRef = z.infer<typeof AgentRef>;
+
+/**
  * Transition: one full waiting → processing → waiting cycle.
  * This is the only durable artifact. If something happened that isn't here,
  * it's a defect.
  */
 export const Transition = z.object({
   cycleId: z.string().min(1),
+  agent: AgentRef,
   event: Event,
   fromState: z.literal("waiting"),
   toState: z.literal("waiting"),

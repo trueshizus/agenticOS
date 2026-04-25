@@ -1,4 +1,5 @@
 import {
+  type AgentRef,
   Chunk,
   type Event,
   type Outcome,
@@ -29,6 +30,7 @@ import type { TraceSink } from "./trace-sink.ts";
  */
 
 export interface RunCycleArgs {
+  agent: AgentRef;
   worker: Worker;
   workerName: string;
   event: Event;
@@ -36,7 +38,7 @@ export interface RunCycleArgs {
 }
 
 export async function runCycle(args: RunCycleArgs): Promise<Transition> {
-  const { worker, workerName, event, ports } = args;
+  const { agent, worker, workerName, event, ports } = args;
   const cycleId = ports.cycleId();
   const startedAt = ports.now();
 
@@ -81,6 +83,7 @@ export async function runCycle(args: RunCycleArgs): Promise<Transition> {
 
   return {
     cycleId,
+    agent,
     event,
     fromState: "waiting",
     toState: "waiting",
@@ -102,17 +105,19 @@ export async function runCycle(args: RunCycleArgs): Promise<Transition> {
  * recorded too, with a `dropped` outcome, for full causal coverage).
  */
 export function buildDispatcher(args: {
+  agent: AgentRef;
   dedup: DedupStore;
   sink: TraceSink;
   ports: Ports;
 }) {
-  const { dedup, sink, ports } = args;
+  const { agent, dedup, sink, ports } = args;
 
   return async function dispatch(input: unknown): Promise<Transition> {
     const decision: IngressDecision = ingress(input, dedup);
 
     if (decision.kind === "dispatch") {
       const transition = await runCycle({
+        agent,
         worker: decision.worker,
         workerName: decision.workerName,
         event: decision.event,
@@ -137,6 +142,7 @@ export function buildDispatcher(args: {
     const reason = describeDrop(decision);
     const transition: Transition = {
       cycleId: ports.cycleId(),
+      agent,
       event: droppedEvent,
       fromState: "waiting",
       toState: "waiting",

@@ -4,15 +4,38 @@ import { createInMemoryDedupStore } from "./dedup.ts";
 import { createJsonlTraceSink } from "./trace-sink.ts";
 import { buildDispatcher } from "./machine.ts";
 import { eventFromArgv } from "./sources/cli.ts";
-import { describeRegistry } from "./registry.ts";
+import { describeRegistry, registry } from "./registry.ts";
+import {
+  AgentBootError,
+  assertCapabilitiesMatchRegistry,
+  loadAgentMd,
+} from "./agent-md.ts";
 
 async function main(argv: string[]): Promise<void> {
+  // Boot: agent.md is the entry point. Without it, nothing runs.
+  let agent;
+  try {
+    agent = await loadAgentMd(process.cwd());
+    assertCapabilitiesMatchRegistry(agent.manifest, Object.keys(registry));
+  } catch (err) {
+    if (err instanceof AgentBootError) {
+      process.stderr.write(`boot error: ${err.message}\n`);
+      process.exit(2);
+    }
+    throw err;
+  }
+
   if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
     const reg = describeRegistry()
       .map((r) => `  ${r.type}\t→ ${r.worker}`)
       .join("\n");
     process.stdout.write(
       [
+        `agent: ${agent.manifest.name} v${agent.manifest.version} (${agent.sha256.slice(0, 12)})`,
+        `role:  ${agent.manifest.role}`,
+        `caps:  ${agent.manifest.capabilities.join(", ")}`,
+        `tools: ${agent.manifest.tools.length > 0 ? agent.manifest.tools.join(", ") : "<none>"}`,
+        "",
         "usage: bun run src/index.ts <type> [arg ...] [--id <uuid>]",
         "       bun run src/index.ts --stdin   # read JSON Events, one per line",
         "",
@@ -27,7 +50,7 @@ async function main(argv: string[]): Promise<void> {
   const ports = realPorts;
   const dedup = createInMemoryDedupStore();
   const sink = await createJsonlTraceSink("traces/run.jsonl");
-  const dispatch = buildDispatcher({ dedup, sink, ports });
+  const dispatch = buildDispatcher({ agent: agent.ref, dedup, sink, ports });
 
   if (argv[0] === "--stdin") {
     const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });

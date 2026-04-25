@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { Transition, type Event } from "../src/schemas.ts";
+import { Transition, type AgentRef, type Event } from "../src/schemas.ts";
 import { createInMemoryDedupStore } from "../src/dedup.ts";
 import { createJsonlTraceSink } from "../src/trace-sink.ts";
 import { buildDispatcher } from "../src/machine.ts";
@@ -17,6 +17,12 @@ function fixedPorts(): Ports {
   };
 }
 
+const AGENT: AgentRef = {
+  name: "test-agent",
+  version: "0.0.1",
+  sha256: "0".repeat(64),
+};
+
 let dir: string;
 let tracePath: string;
 
@@ -29,7 +35,7 @@ test("same event id dispatched twice → first runs, second is dropped as duplic
   const ports = fixedPorts();
   const dedup = createInMemoryDedupStore();
   const sink = await createJsonlTraceSink(tracePath);
-  const dispatch = buildDispatcher({ dedup, sink, ports });
+  const dispatch = buildDispatcher({ agent: AGENT, dedup, sink, ports });
 
   const event: Event = {
     id: "same-id",
@@ -63,7 +69,7 @@ test("malformed input produces a dropped Transition with reason=invalid", async 
   const ports = fixedPorts();
   const dedup = createInMemoryDedupStore();
   const sink = await createJsonlTraceSink(tracePath);
-  const dispatch = buildDispatcher({ dedup, sink, ports });
+  const dispatch = buildDispatcher({ agent: AGENT, dedup, sink, ports });
 
   const t = await dispatch({ not: "an event" });
 

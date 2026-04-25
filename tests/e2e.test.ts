@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { Transition, type Event } from "../src/schemas.ts";
+import { Transition, type AgentRef, type Event } from "../src/schemas.ts";
 import { createInMemoryDedupStore } from "../src/dedup.ts";
 import { createJsonlTraceSink } from "../src/trace-sink.ts";
 import { buildDispatcher } from "../src/machine.ts";
@@ -16,6 +16,12 @@ function fixedPorts(): Ports {
     cycleId: () => `cycle-${++n}`,
   };
 }
+
+const AGENT: AgentRef = {
+  name: "test-agent",
+  version: "0.0.1",
+  sha256: "0".repeat(64),
+};
 
 let dir: string;
 let tracePath: string;
@@ -37,7 +43,7 @@ test("ping event produces one valid Transition with outcome=final/pong", async (
   const ports = fixedPorts();
   const dedup = createInMemoryDedupStore();
   const sink = await createJsonlTraceSink(tracePath);
-  const dispatch = buildDispatcher({ dedup, sink, ports });
+  const dispatch = buildDispatcher({ agent: AGENT, dedup, sink, ports });
 
   const event: Event = {
     id: "evt-1",
@@ -70,7 +76,7 @@ test("echo streams words then a final equal to the joined message", async () => 
   const ports = fixedPorts();
   const dedup = createInMemoryDedupStore();
   const sink = await createJsonlTraceSink(tracePath);
-  const dispatch = buildDispatcher({ dedup, sink, ports });
+  const dispatch = buildDispatcher({ agent: AGENT, dedup, sink, ports });
 
   const event: Event = {
     id: "evt-2",
@@ -94,7 +100,7 @@ test("unknown event type produces a dropped Transition", async () => {
   const ports = fixedPorts();
   const dedup = createInMemoryDedupStore();
   const sink = await createJsonlTraceSink(tracePath);
-  const dispatch = buildDispatcher({ dedup, sink, ports });
+  const dispatch = buildDispatcher({ agent: AGENT, dedup, sink, ports });
 
   const event: Event = {
     id: "evt-3",
